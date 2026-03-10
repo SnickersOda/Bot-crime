@@ -2353,6 +2353,28 @@ async def broadcast_events(bot: Bot) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  KEEP-ALIVE WEB SERVER (для Render Web Service)
+# ══════════════════════════════════════════════════════════════════════════════
+from aiohttp import web as aiohttp_web
+
+
+async def health(request):
+    return aiohttp_web.Response(text="OK")
+
+
+async def run_web_server() -> None:
+    app = aiohttp_web.Application()
+    app.router.add_get("/", health)
+    app.router.add_get("/health", health)
+    runner = aiohttp_web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = aiohttp_web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    log.info(f"🌐 Health server started on port {port}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 async def main() -> None:
@@ -2370,9 +2392,13 @@ async def main() -> None:
     # Start background tasks
     asyncio.create_task(season_watcher(bot))
 
+    # Start keep-alive web server for Render
+    asyncio.create_task(run_web_server())
+
     log.info("🤖 CriminalCity RPG Bot starting...")
     await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
 
 
 if __name__ == "__main__":
+    import os
     asyncio.run(main())
