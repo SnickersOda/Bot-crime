@@ -346,6 +346,12 @@ def main_menu_kb() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(text="🎁 Daily награда",     callback_data="daily"),
         ],
+        [
+            InlineKeyboardButton(
+                text="➕ Добавить бота в группу",
+                url=f"https://t.me/{config.BOT_USERNAME}?startgroup=true&admin=post_messages+delete_messages+pin_messages" if config.BOT_USERNAME else "https://t.me/",
+            ),
+        ],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -444,16 +450,48 @@ async def guard(message_or_cb, user_id: int) -> asyncpg.Record | None:
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     if message.chat.type != "private":
+        # Bot was added to group via startgroup link
+        if message.chat.type in ("group", "supergroup"):
+            await message.answer(
+                "🌆 <b>CriminalCity RPG</b> теперь в этой группе!\n\n"
+                "Здесь будут отображаться игровые события.\n"
+                "Управляй персонажем в <b>личных сообщениях</b> с ботом.",
+                parse_mode=ParseMode.HTML,
+            )
         return
     user = message.from_user
     await get_or_create_user(user.id, user.username or "", user.full_name)
+    bot_info = await message.bot.get_me()
+    add_url = f"https://t.me/{bot_info.username}?startgroup=true&admin=post_messages+delete_messages+pin_messages"
+    kb = main_menu_kb()
+    kb.inline_keyboard.append([
+        InlineKeyboardButton(text="➕ Добавить бота в группу", url=add_url)
+    ])
     await message.answer(
         "🌆 <b>Добро пожаловать в CriminalCity RPG!</b>\n\n"
         "Стань криминальным авторитетом — грабь, дерись, властвуй.\n"
         "Выбери действие:",
-        reply_markup=main_menu_kb(),
+        reply_markup=kb,
         parse_mode=ParseMode.HTML,
     )
+
+
+@router.my_chat_member()
+async def on_my_chat_member(update, bot: Bot) -> None:
+    """Fires when bot is added to / removed from a chat."""
+    from aiogram.types import ChatMemberUpdated
+    event: ChatMemberUpdated = update
+    if event.chat.type not in ("group", "supergroup"):
+        return
+    new_status = event.new_chat_member.status
+    if new_status in ("member", "administrator"):
+        await bot.send_message(
+            event.chat.id,
+            "🌆 <b>CriminalCity RPG</b> активирован в этой группе!\n\n"
+            "⚔️ Здесь будут появляться новости преступного мира.\n"
+            "🎮 Управляй персонажем в личке с ботом — нажми /start.",
+            parse_mode=ParseMode.HTML,
+        )
 
 
 @router.callback_query(F.data == "main_menu")
@@ -2396,7 +2434,7 @@ async def main() -> None:
     asyncio.create_task(run_web_server())
 
     log.info("🤖 CriminalCity RPG Bot starting...")
-    await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
+    await dp.start_polling(bot, allowed_updates=["message", "callback_query", "my_chat_member"])
 
 
 if __name__ == "__main__":
