@@ -40,7 +40,7 @@ DAILY_REWARD_MAX: int = 600
 DAILY_XP: int = 20
 
 # Jail
-JAIL_DURATION: int = 600          # seconds
+JAIL_DURATION: int = 300          # seconds
 
 # XP per level: level_xp = BASE * level^EXPONENT
 XP_BASE: int = 100
